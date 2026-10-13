@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Number Guessing Game</title>
+<style>
+  /* ---------- Theme ---------- */
+  :root {
+    --bg1: #0f0c29;
+    --bg2: #302b63;
+    --bg3: #24243e;
+    --accent: #7c5cff;
+    --accent2: #00d4ff;
+    --good: #2ee59d;
+    --bad: #ff5c7a;
+    --warn: #ffb84d;
+    --text: #f1f1ff;
+    --muted: #a5a5c8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    color: var(--text);
+    background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+    background-size: 200% 200%;
+    animation: bgShift 18s ease infinite;
+    overflow-x: hidden;
+  }
+  @keyframes bgShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Decorative glowing blobs behind the card */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.45;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .blob.one { width: 320px; height: 320px; background: var(--accent);  top: -80px;  left: -80px; }
+  .blob.two { width: 280px; height: 280px; background: var(--accent2); bottom: -80px; right: -60px; }
+
+  /* ---------- Glass card ---------- */
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    padding: 32px 26px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 24px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  }
+  .card.shake { animation: shake 0.45s ease; }
+  .card.win   { animation: bounce 0.8s ease; }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-12px); }
+    40% { transform: translateX(10px); }
+    60% { transform: translateX(-8px); }
+    80% { transform: translateX(6px); }
+  }
+  @keyframes bounce {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.06) translateY(-10px); }
+    50%  { transform: scale(0.98) translateY(0); }
+    70%  { transform: scale(1.03) translateY(-5px); }
+    100% { transform: scale(1); }
+  }
+
+  h1 {
+    font-size: 1.7rem;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .subtitle { margin-top: 6px; color: var(--muted); font-size: 0.95rem; }
+
+  /* ---------- Stats row ---------- */
+  .stats {
+    display: flex;
+    gap: 10px;
+    margin: 22px 0 14px;
+  }
+  .stat {
+    flex: 1;
+    padding: 10px 6px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+  }
+  .stat .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .stat .value { font-size: 1.4rem; font-weight: 700; margin-top: 2px; }
+  .stat .value.pop { animation: pop 0.3s ease; }
+  @keyframes pop { 50% { transform: scale(1.3); } }
+
+  /* Attempt dots: one per allowed attempt, like the C MAX_ATTEMPTS */
+  .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 18px; }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background 0.3s, transform 0.3s;
+  }
+  .dot.used { background: var(--accent); transform: scale(1.15); }
+  .dot.last { background: var(--warn); }
+
+  /* ---------- Feedback ---------- */
+  .feedback {
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .feedback.show { animation: slideIn 0.35s ease; }
+  .feedback.high  { color: var(--bad); }
+  .feedback.low   { color: var(--accent2); }
+  .feedback.win   { color: var(--good); }
+  .feedback.lose  { color: var(--warn); }
+  .feedback.info  { color: var(--muted); font-weight: 500; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Input + buttons ---------- */
+  .input-row { display: flex; gap: 10px; }
+  input[type="number"] {
+    flex: 1;
+    min-width: 0;
+    padding: 14px;
+    font-size: 1.2rem;
+    text-align: center;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield;
+  }
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.35); }
+  input:disabled { opacity: 0.5; }
+
+  button {
+    padding: 14px 22px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+    box-shadow: 0 8px 20px rgba(124, 92, 255, 0.4);
+  }
+  button:hover:not(:disabled) { transform: translateY(-2px); }
+  button:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+  #restartBtn {
+    display: none;
+    width: 100%;
+    margin-top: 14px;
+    background: linear-gradient(135deg, var(--good), var(--accent2));
+    animation: slideIn 0.4s ease;
+  }
+
+  .history { margin-top: 18px; font-size: 0.85rem; color: var(--muted); min-height: 20px; }
+  .history span {
+    display: inline-block;
+    margin: 2px 3px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Confetti canvas sits above everything but doesn't block clicks */
+  #confetti { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+
+  @media (max-width: 400px) {
+    .card { padding: 26px 18px; }
+    h1 { font-size: 1.45rem; }
+    button { padding: 14px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="blob one"></div>
+  <div class="blob two"></div>
+  <canvas id="confetti"></canvas>
+
+  <main class="card" id="card">
+    <h1>Number Guesser</h1>
+    <p class="subtitle">I'm thinking of a number between 1 and 100</p>
+
+    <div class="stats">
+      <div class="stat"><div class="label">Attempts</div><div class="value" id="attempts">0</div></div>
+      <div class="stat"><div class="label">Left</div><div class="value" id="left">7</div></div>
+      <div class="stat"><div class="label">Best</div><div class="value" id="best">–</div></div>
+    </div>
+
+    <div class="dots" id="dots"></div>
+
+    <div class="feedback info" id="feedback">Make your first guess!</div>
+
+    <div class="input-row">
+      <input type="number" id="guessInput" min="1" max="100" placeholder="1 - 100" inputmode="numeric" autofocus>
+      <button id="guessBtn">Guess</button>
+    </div>
+
+    <button id="restartBtn">Play Again</button>
+
+    <div class="history" id="history"></div>
+  </main>
+
+<script>
+  // ============================================================
+  //  Number Guessing Game (web port of the C version)
+  //  Rules: secret number 1-100, max 7 attempts, best = fewest attempts
+  // ============================================================
+  const MAX_ATTEMPTS = 7;          // same as #define MAX_ATTEMPTS 7 in the C code
+  const STORAGE_KEY = "guessGameBestScore";
+
+  // ----- Grab DOM elements -----
+  const card       = document.getElementById("card");
+  const input      = document.getElementById("guessInput");
+  const guessBtn   = document.getElementById("guessBtn");
+  const restartBtn = document.getElementById("restartBtn");
+  const feedback   = document.getElementById("feedback");
+  const attemptsEl = document.getElementById("attempts");
+  const leftEl     = document.getElementById("left");
+  const bestEl     = document.getElementById("best");
+  const dotsEl     = document.getElementById("dots");
+  const historyEl  = document.getElementById("history");
+
+  // ----- Game state -----
+  let secret;        // the random number (like `random` in C)
+  let attempts;      // number of guesses so far (like `number_of_guess`)
+  let gameOver;
+  let guesses;       // list of past guesses for the history chips
+
+  // ----- Safe localStorage helpers (can fail in private mode) -----
+  function loadBest() {
+    try {
+      const v = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+      return Number.isFinite(v) ? v : null;
+    } catch (e) { return null; }
+  }
+  function saveBest(n) {
+    try { localStorage.setItem(STORAGE_KEY, String(n)); } catch (e) { /* ignore */ }
+  }
+
+  // ----- Start / restart a game -----
+  function newGame() {
+    secret = Math.floor(Math.random() * 100) + 1;   // same as rand()%100+1
+    attempts = 0;
+    gameOver = false;
+    guesses = [];
+
+    input.value = "";
+    input.disabled = false;
+    guessBtn.disabled = false;
+    restartBtn.style.display = "none";
+    historyEl.innerHTML = "";
+
+    setFeedback("Make your first guess!", "info");
+    updateStats();
+    renderDots();
+    stopConfetti();
+    input.focus();
+  }
+
+  // ----- UI helpers -----
+  function setFeedback(text, type) {
+    feedback.textContent = text;
+    feedback.className = "feedback show " + type;
+    // restart the CSS animation each time
+    void feedback.offsetWidth;
+  }
+
+  function bump(el) {
+    el.classList.remove("pop");
+    void el.offsetWidth;
+    el.classList.add("pop");
+  }
+
+  function updateStats() {
+    attemptsEl.textContent = attempts;
+    leftEl.textContent = MAX_ATTEMPTS - attempts;
+    const best = loadBest();
+    bestEl.textContent = best === null ? "–" : best;
+    bump(attemptsEl);
+  }
+
+  function renderDots() {
+    dotsEl.innerHTML = "";
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const d = document.createElement("div");
+      d.className = "dot";
+      if (i < attempts) d.classList.add("used");
+      if (i === MAX_ATTEMPTS - 1 && i < attempts) d.classList.add("last");
+      dotsEl.appendChild(d);
+    }
+  }
+
+  function renderHistory() {
+    historyEl.innerHTML = guesses.map(g => "<span>" + g + "</span>").join("");
+  }
+
+  function triggerCard(cls) {
+    card.classList.remove("shake", "win");
+    void card.offsetWidth;
+    card.classList.add(cls);
+  }
+
+  function endGame() {
+    gameOver = true;
+    input.disabled = true;
+    guessBtn.disabled = true;
+    restartBtn.style.display = "block";
+  }
+
+  // ----- Core guess logic -----
+  function makeGuess() {
+    if (gameOver) return;
+
+    const raw = input.value.trim();
+    const guess = parseInt(raw, 10);
+
+    // Validation (like the scanf check in the C code)
+    if (raw === "" || Number.isNaN(guess) || guess < 1 || guess > 100) {
+      setFeedback("Please enter a valid number from 1 to 100!", "info");
+      triggerCard("shake");
+      return;
+    }
+
+    attempts++;
+    guesses.push(guess);
+    updateStats();
+    renderDots();
+    renderHistory();
+    input.value = "";
+
+    if (guess > secret) {
+      setFeedback("Too high! Try a lower number", "high");
+      triggerCard("shake");
+    } else if (guess < secret) {
+      setFeedback("Too low! Try a higher number", "low");
+      triggerCard("shake");
+    } else {
+      // WIN
+      setFeedback("Correct! You won in " + attempts + (attempts === 1 ? " attempt!" : " attempts!"), "win");
+      triggerCard("win");
+      startConfetti();
+
+      // Update best score (fewer attempts = better)
+      const best = loadBest();
+      if (best === null || attempts < best) {
+        saveBest(attempts);
+        updateStats();
+        setTimeout(() => setFeedback("New high score: " + attempts + " attempts! 🏆", "win"), 1400);
+      }
+      endGame();
+      return;
+    }
+
+    // Out of chances (same as the MAX_ATTEMPTS check in C)
+    if (attempts >= MAX_ATTEMPTS) {
+      setFeedback("Out of chances! The number was " + secret, "lose");
+      endGame();
+    } else if (attempts === MAX_ATTEMPTS - 1) {
+      // small nudge on the final attempt, appended after the hint
+      feedback.textContent += "  (last chance!)";
+    }
+  }
+
+  // ----- Events -----
+  guessBtn.addEventListener("click", makeGuess);
+  restartBtn.addEventListener("click", newGame);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") makeGuess();       // Enter-key support
+  });
+
+  // ============================================================
+  //  Confetti (lightweight canvas animation, no libraries)
+  // ============================================================
+  const canvas = document.getElementById("confetti");
+  const ctx = canvas.getContext("2d");
+  let pieces = [];
+  let confettiRunning = false;
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  function startConfetti() {
+    const colors = ["#7c5cff", "#00d4ff", "#2ee59d", "#ffb84d", "#ff5c7a", "#ffffff"];
+    pieces = [];
+    for (let i = 0; i < 160; i++) {
+      pieces.push({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height * 0.5,
+        w: 6 + Math.random() * 6,
+        h: 8 + Math.random() * 8,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: 2 + Math.random() * 4,
+        drift: (Math.random() - 0.5) * 3,
+        rot: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.3
+      });
+    }
+    if (!confettiRunning) {
+      confettiRunning = true;
+      requestAnimationFrame(drawConfetti);
+    }
+  }
+
+  function drawConfetti() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      p.y += p.speed;
+      p.x += p.drift;
+      p.rot += p.spin;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    // remove pieces that fell off the screen
+    pieces = pieces.filter(p => p.y < canvas.height + 30);
+    if (pieces.length > 0 && confettiRunning) {
+      requestAnimationFrame(drawConfetti);
+    } else {
+      confettiRunning = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function stopConfetti() {
+    pieces = [];
+    confettiRunning = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // ----- Kick things off -----
+  newGame();
+</script>
+</body>
+</html>
